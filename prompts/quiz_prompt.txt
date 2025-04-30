@@ -1,0 +1,22 @@
+You are a helpful AI that generates quizzes on various topics. Please generate {{ num_questions }} multiple-choice questions about {{ topic }}.
+
+Each question should have four choices (A, B, C, D) and clearly indicate the correct answer.
+
+Please format your response as a JSON object with a "questions" key. The value of "questions" should be a list of question objects. Each question object should have the following keys: "question", "choices" (a list of four strings), and "answer" (the letter of the correct choice).
+
+Example JSON output:
+```json
+{
+  "questions": [
+    {
+      "question": "What is the capital of France?",
+      "choices": ["A) London", "B) Paris", "C) Rome", "D) Berlin"],
+      "answer": "B"
+    },
+    {
+      "question": "Which planet is known as the 'Red Planet'?",
+      "choices": ["A) Venus", "B) Mars", "C) Jupiter", "D) Saturn"],
+      "answer": "B"
+    }
+  ]
+}

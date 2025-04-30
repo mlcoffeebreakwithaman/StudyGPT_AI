@@ -1,0 +1,82 @@
+# 🔥 Core AI / LangChain ecosystem
+langchain
+langchain-openai
+langchain-community
+langchainhub
+langgraph
+langchain_huggingface
+
+# 🔥 LLMs and embeddings
+transformers
+sentence-transformers
+accelerate
+bitsandbytes
+
+# 🔥 Retrieval / Vector DB
+faiss-cpu
+milvus
+
+# 🔥 PDF + Text Processing
+pdfplumber
+pymupdf
+pypdf
+tika
+beautifulsoup4
+regex
+unidecode
+
+# 🔥 Data Handling / Preprocessing
+pandas
+numpy
+scikit-learn
+
+# 🔥 Configuration and Parsing
+pyyaml
+python-dotenv
+yamllint
+cerberus
+
+# 🔥 FastAPI Backend
+fastapi
+uvicorn
+python-multipart
+fastapi-cors
+
+# 🔥 Logging & Error Handling
+loguru
+
+# 🔥 Async Utilities
+aiofiles
+aiohttp
+
+# 🔥 Testing
+pytest
+httpx
+
+# 🔥 Security / Crypto
+python-jose
+
+# 🔥 Optional Dev Utilities
+ipython
+jupyter
+
+# 🔥 System Monitoring
+psutil
+prometheus-client
+
+# 🔥 API Docs Generation
+pydantic
+pydantic-settings
+
+# 🔥 LangChain Tracing / Debugging
+langsmith
+langchain-cli
+
+# 🔥 Experiment Tracking
+mlflow
+
+# 🔥 Miscellaneous
+rich
+requests
+reportlab
+nltk

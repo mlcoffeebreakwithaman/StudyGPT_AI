@@ -1,4 +1,8 @@
-# .gitignore
-.VENV/
+..VENV/
+.venv/
 venv/
-env/
+__pycache__/
+*.pyc
+*.log
+.vscode/
+.DS_Store
