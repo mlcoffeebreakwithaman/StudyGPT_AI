@@ -1,89 +1,77 @@
 import logging
-from typing import Dict, List, Union
-from core.agents.base_agent import BaseAgent
+from typing import Dict, Any, List, Optional
+from core.llm_wrapper import LLMWrapper
+from core.agents.tutor_agent import TutorAgent
+from core.agents.quiz_agent import QuizAgent
+from core.agents.recommendation_agent import RecommendationAgent
 from core.agents.progress_agent import ProgressAgent
 
 logger = logging.getLogger(__name__)
 
 class AgentManager:
-    def __init__(self, config: dict, agents: Dict[str, BaseAgent]):
+    def __init__(self, config: Dict[str, Any], agents: Optional[Dict[str, Any]] = None):
+        """
+        Initializes the AgentManager with a configuration and an optional dictionary of agents.
+        """
         self.config = config
-        self.llm_wrapper = config.get("llm_wrapper")
+        self.llm_wrapper: LLMWrapper = config.get("llm_wrapper")
+        if not self.llm_wrapper:
+            raise ValueError("LLM wrapper instance must be provided in the config.")
         self.vector_memory = config.get("vector_memory")
-        self.agents: Dict[str, BaseAgent] = self._initialize_agents(agents)
-        logger.info("All agents initialized.")
+        if not self.vector_memory:
+            raise ValueError("Vector memory instance must be provided in the config.")
+        self.agents: Dict[str, Any] = agents if agents is not None else self._initialize_agents()
+        logger.info("AgentManager initialized.")
 
-    def _initialize_agents(self, initial_agents: Dict[str, BaseAgent]) -> Dict[str, BaseAgent]:
-        agents = {}
-        llm_config = {"llm_wrapper": self.llm_wrapper, "vector_memory": self.vector_memory}
-        # Initialize Tutor Agent
-        if "tutor" not in initial_agents:
-            from core.agents.tutor_agent import TutorAgent
-            agents["tutor"] = TutorAgent(config=llm_config)
-            logger.info("TutorAgent initialized.")
-        else:
-            agents["tutor"] = initial_agents["tutor"]
+    def _initialize_agents(self) -> Dict[str, Any]:
+        """
+        Initializes the individual agents managed by this AgentManager.
+        """
+        llm_config_path = self.config.get("llm_config_path")
+        if not llm_config_path:
+            raise ValueError("LLM config path must be provided in the config for agent initialization.")
 
-        # Initialize Quiz Agent
-        if "quiz" not in initial_agents:
-            from core.agents.quiz_agent import QuizAgent
-            agents["quiz"] = QuizAgent(config=llm_config)
-            logger.info("QuizAgent initialized.")
-        else:
-            agents["quiz"] = initial_agents["quiz"]
+        tutor_agent = TutorAgent(config=self.config)
+        logger.info("TutorAgent initialized.")
 
-        # Initialize Recommendation Agent
-        if "recommendation" not in initial_agents:
-            from core.agents.recommendation_agent import RecommendationAgent
-            agents["recommendation"] = RecommendationAgent(config=llm_config)
-            logger.info("RecommendationAgent initialized.")
-        else:
-            agents["recommendation"] = initial_agents["recommendation"]
+        quiz_agent = QuizAgent(config=self.config)
+        logger.info("QuizAgent initialized.")
 
-        # Initialize Progress Agent
-        if "progress" not in initial_agents:
-            from core.agents.progress_agent import ProgressAgent
-            agents["progress"] = ProgressAgent(config={}) # Progress agent doesn't need LLM or vector memory
-            logger.info("ProgressAgent initialized.")
-        else:
-            agents["progress"] = initial_agents["progress"]
+        recommendation_agent = RecommendationAgent(config=self.config)
+        logger.info("RecommendationAgent initialized.")
 
-        return agents
+        progress_agent = ProgressAgent(config=self.config) # Corrected initialization: Passing the entire config
+        logger.info("ProgressAgent initialized.")
 
-    async def _determine_relevant_agent(self, user_input: str) -> Union[str, None]:
-        # Simple keyword-based routing for now
-        if "quiz" in user_input.lower() or "test" in user_input.lower() or "assess" in user_input.lower():
-            return "quiz"
-        elif "recommend" in user_input.lower() or "suggest" in user_input.lower() or "what should i learn" in user_input.lower():
-            return "recommendation"
-        elif "progress" in user_input.lower() or "how am i doing" in user_input.lower() or "my score" in user_input.lower():
-            return "progress"
-        else:
-            return "tutor" # Default to tutor agent
+        initialized_agents = {
+            "tutor": tutor_agent,
+            "quiz": quiz_agent,
+            "recommendation": recommendation_agent,
+            "progress": progress_agent,
+        }
+        print(f"Initialized agents: {initialized_agents}") # Added debug print
+        return initialized_agents
 
-    async def handle_input(self, user_input: str, user_history: List[str] = None, progress: ProgressAgent = None) -> Union[dict, str, None]:
-        logger.info(f"AgentManager: Handling input: '{user_input}'")
-        if progress:
-            await progress.record_question_asked(user_input)
+    async def handle_input(self, user_input: str, user_history: List[str], progress: Optional[ProgressAgent] = None) -> Optional[Dict[str, Any]]:
+        """
+        Routes the user input to the appropriate agent based on the context.
+        """
+        logger.info(f"AgentManager: Handling user input: '{user_input}'")
 
-        # Determine the most relevant agent
-        relevant_agent_name = await self._determine_relevant_agent(user_input)
-        logger.info(f"AgentManager: Relevant agent determined: '{relevant_agent_name}'")
-
-        if relevant_agent_name:
-            agent = self.agents.get(relevant_agent_name)
-            if agent:
-                logger.info(f"AgentManager: Calling agent: '{relevant_agent_name}'")
-                try:
-                    response = await agent.handle_input(user_input, user_history=user_history, progress=progress)
-                    logger.info(f"AgentManager: Response received from '{relevant_agent_name}': {response}") # Log the response
-                    return response
-                except Exception as e:
-                    logger.error(f"AgentManager: Error calling agent '{relevant_agent_name}': {e}")
-                    return None
+        if user_input.lower().startswith("quiz me"):
+            logger.info("AgentManager: Routing to QuizAgent.")
+            return await self.agents["quiz"].handle_input(user_input, user_history, progress=progress)
+        elif user_input.lower().startswith("what should i learn next") or user_input.lower().startswith("recommend a topic"):
+            logger.info("AgentManager: Routing to RecommendationAgent.")
+            return await self.agents["recommendation"].handle_input(user_input, user_history, progress=progress)
+        elif user_input.lower().startswith("progress"):
+            logger.info("AgentManager: Routing to ProgressAgent.")
+            if progress:
+                return await progress.get_progress_summary() # Assuming this is an async method
             else:
-                logger.warning(f"AgentManager: Relevant agent '{relevant_agent_name}' not found.")
-                return None
+                return {"response": "Progress tracking is not available at the moment.", "source": "AgentManager", "confidence": "low"}
         else:
-            logger.warning("AgentManager: No relevant agent found for the input.")
-            return None
+            logger.info("AgentManager: Routing to TutorAgent.")
+            # Default to the tutor agent for learning and explanations
+            logger.debug(f"AgentManager: Type of agent_to_use: {type(self.agents.get('tutor'))}") # Added debug line
+            return await self.agents["tutor"].handle_input(user_input, user_history, progress=progress)

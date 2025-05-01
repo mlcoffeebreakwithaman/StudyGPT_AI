@@ -63,16 +63,13 @@ class VectorMemory:
         if self.vectorstore:
             logger.info(f"FAISS index created with {self.vectorstore.index.ntotal} vectors.")
 
-    async def retrieve(self, query: str, k: int = 3) -> str:
-        """Retrieves relevant documents based on the query."""
+    async def retrieve(self, query: str, k: int = 3) -> List[Document]:
+        """Retrieves the top k most relevant documents from the vector store."""
         if self.vectorstore:
-            try:
-                docs_and_scores = await self.vectorstore.asimilarity_search_with_score(query, k=k)
-                relevant_chunks = [doc.page_content for doc, _ in docs_and_scores]
-                return "\n\n".join(relevant_chunks)
-            except Exception as e:
-                logger.error(f"Error during retrieval: {e}")
-                return ""
+            retriever = self.vectorstore.as_retriever(search_kwargs={'k': k})
+            docs = await retriever.aget_relevant_documents(query)
+            logger.info(f"VectorMemory: Retrieved {len(docs)} documents for query: '{query}'")
+            return docs
         else:
-            logger.warning("Vector store not initialized for retrieval.")
-            return ""
+            logger.warning("VectorMemory: Vector store not initialized. Cannot retrieve documents.")
+            return []

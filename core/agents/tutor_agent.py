@@ -59,7 +59,7 @@ class TutorAgent(BaseAgent):
         prompt = self._create_prompt(question, context)
         logger.info(f"TutorAgent: Generated prompt: '{prompt}'")
         try:
-            response = self.llm_wrapper.generate_response(prompt, generation_kwargs={"max_new_tokens": self.max_new_tokens, "temperature": 0.7})
+            response = await self.llm_wrapper.generate_response(prompt, context=context, generation_kwargs={"max_new_tokens": self.max_new_tokens, "temperature": 0.7})
             logger.info(f"TutorAgent: Raw LLM response: {response}")
             answer = response[0] if response else "No answer found after generation."
             logger.info(f"TutorAgent: Generated answer: '{answer}'")

@@ -156,12 +156,12 @@ class LLMWrapper:
             # Wrap any exception during model loading as LLMConnectionError
             raise LLMConnectionError(f"Error loading model: {e}", details={"model_name": self.model_name}) from e
 
-    def generate_response(
+    async def generate_response(
         self, prompt: str, context: str, generation_kwargs: Optional[Dict[str, Any]] = None
     ) -> Optional[List[str]]:
         """
         Generates a response from the language model with retry mechanism,
-        now explicitly taking context as an argument.
+        now explicitly taking context as an argument and defined as async.
 
         Args:
             prompt: The input question string.
@@ -225,14 +225,14 @@ class LLMWrapper:
             except LLMConnectionError as e:
                 logger.error(f"Attempt {attempt + 1}/{self.max_retries} failed to generate response: {e}")
                 if attempt < self.max_retries - 1:
-                    time.sleep(self.retry_delay ** (attempt + 1))  # Exponential backoff
+                    await asyncio.sleep(self.retry_delay ** (attempt + 1))  # Exponential backoff
                 else:
                     logger.error(f"All {self.max_retries} attempts to generate response failed.")
                     raise  # Re-raise the last exception
             except Exception as e:
                 logger.error(f"An unexpected error occurred during response generation (attempt {attempt + 1}): {e}")
                 if attempt < self.max_retries - 1:
-                    time.sleep(self.retry_delay ** (attempt + 1))  # Exponential backoff
+                    await asyncio.sleep(self.retry_delay ** (attempt + 1))  # Exponential backoff
                 else:
                     logger.error(f"All {self.max_retries} attempts to generate response failed due to unexpected error.")
                     raise LLMConnectionError(f"Failed to generate response after multiple retries due to: {e}", details={"prompt": prompt, "context": context}) from e

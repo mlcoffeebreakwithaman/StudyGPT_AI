@@ -3,11 +3,11 @@ import sys
 import os
 import yaml
 import random
-from typing import List, Optional, Dict, Tuple
+from typing import List, Optional, Dict, Tuple, Any
 import logging
 from collections import deque
 import time
-import json # Import json
+import json  # Import json
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
@@ -17,42 +17,54 @@ logger = logging.getLogger(__name__)
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, project_root)
 
+from core.agents.base_agent import BaseAgent
 from core.agents.textbook_agent import TextbookAgent, FaissIndexError, ChunksFileError
 from core.llm_wrapper import LLMWrapper, LLMConnectionError, AgentConfigError
-from core.exceptions import QuizAgentError # Import
+from core.exceptions import QuizAgentError  # Import
 
-class QuizAgent:
-    def __init__(self, llm_wrapper: LLMWrapper, vector_memory, config: Optional[Dict] = None,
-                 faiss_index_path: str = "data/index",  # Changed default to the directory
-                 llm_config_path: str = "config/llm_config.yaml",
-                 chunks_file_path: str = "data/chunks.txt"):
+
+class QuizAgent(BaseAgent):
+    """
+    Agent responsible for generating and conducting quizzes.
+    """
+
+    def __init__(self, config: Optional[Dict[str, Any]] = None, **kwargs: Any):
         """
         Initializes the QuizAgent.
 
         Args:
-            llm_wrapper (LLMWrapper): An instance of the LLMWrapper.
-            vector_memory: An instance of the VectorMemory.
-            config (Optional[Dict]): Configuration dictionary. Defaults to None.
-            faiss_index_path (str): Path to the FAISS index directory. # Updated description
-            llm_config_path (str): Path to the LLM configuration file.
-            chunks_file_path (str): Path to the text chunks file.
+            config (Optional[Dict]): Configuration dictionary containing llm_wrapper and vector_memory. Defaults to None.
+            **kwargs (Any): Additional keyword arguments.
         """
-        self.llm_wrapper = llm_wrapper
-        self.vector_memory = vector_memory
+        super().__init__(config, **kwargs)  # Call the BaseAgent's __init__ if you are inheriting
+        if config:
+            self.llm_wrapper: LLMWrapper = config.get("llm_wrapper")
+            self.vector_memory = config.get("vector_memory")
+        else:
+            raise ValueError("Configuration dictionary must be provided to QuizAgent.")
+
+        self._initialize_internal_components(config)  # Call a new method for internal setup
+
+        logger = logging.getLogger(__name__)
+        logger.info("QuizAgent initialized.")
+
+    def _initialize_internal_components(self, config: Optional[Dict[str, Any]] = None):
+        """Initializes internal components like TextbookAgent."""
         self.config = config or {}
-        self.faiss_index_path = faiss_index_path
-        self.chunks_file_path = chunks_file_path
+        self.faiss_index_path = self.config.get("faiss_index_path", "data/index")
+        self.chunks_file_path = self.config.get("chunks_file_path", "data/chunks.txt")
         try:
-            self.textbook_agent = TextbookAgent(config=config, faiss_index_path=faiss_index_path,
-                                                chunks_file_path=chunks_file_path)
+            self.textbook_agent = TextbookAgent(config=self.config,
+                                                faiss_index_path=self.faiss_index_path,
+                                                chunks_file_path=self.chunks_file_path)
         except (FaissIndexError, ChunksFileError) as e:
             logger.error(f"Error initializing TextbookAgent: {e}")
             raise QuizAgentError(f"Error initializing TextbookAgent: {e}") from e
-        self.max_new_tokens = 700 # Increased for more verbose output
-        self.max_relevant_chunks = 3
-        self.quiz_history = deque(maxlen=5)  # Keep a history of the last 5 quizzes
-        self.max_retries = 3
-        self.retry_delay = 2  # seconds
+        self.max_new_tokens = self.config.get("max_new_tokens", 700)
+        self.max_relevant_chunks = self.config.get("max_relevant_chunks", 3)
+        self.quiz_history = deque(maxlen=self.config.get("quiz_history_length", 5))
+        self.max_retries = self.config.get("max_retries", 3)
+        self.retry_delay = self.config.get("retry_delay", 2)
 
     def generate_quiz(self, query: str) -> Optional[Dict]:
         """
@@ -117,7 +129,7 @@ class QuizAgent:
                     logger.error(f"All {self.max_retries} attempts to generate quiz failed due to an unexpected error.")
                     raise QuizAgentError(f"Failed to generate quiz after multiple retries due to: {e}") from e
 
-        return None # Should not reach here if exceptions are correctly handled/re-raised
+        return None  # Should not reach here if exceptions are correctly handled/re-raised
 
     def _build_prompt(self, query: str, context: Optional[List[str]] = None) -> str:
         """
@@ -130,7 +142,7 @@ class QuizAgent:
         Returns:
             str: The formatted prompt.
         """
-        prompt = "You are a helpful tutor. Generate a quiz with 1 multiple-choice question based on the following text. " # Reduced to 1 for testing
+        prompt = "You are a helpful tutor. Generate a quiz with 1 multiple-choice question based on the following text. "  # Reduced to 1 for testing
         prompt += "Each question should have 4 options labeled A, B, C, D. Clearly indicate the correct answer.\n\n"
         if context:
             prompt += "Context:\n" + "\n\n".join(context) + "\n\n"
@@ -139,13 +151,13 @@ class QuizAgent:
         prompt += "Each dictionary should have the keys 'question' (the question text), 'choices' (a list of four option strings), and 'answer' (the correct answer as a string - the text of the correct choice).\n\n"
         prompt += "For example:\n"
         prompt += "{\n"
-        prompt += "  'questions': [\n"
-        prompt += "    {\n"
-        prompt += "      'question': 'What is the capital of France?',\n"
-        prompt += "      'choices': ['Berlin', 'Paris', 'Madrid', 'Rome'],\n"
-        prompt += "      'answer': 'Paris'\n"
-        prompt += "    }\n"
-        prompt += "  ]\n"
+        prompt += "  'questions': [\n"
+        prompt += "    {\n"
+        prompt += "      'question': 'What is the capital of France?',\n"
+        prompt += "      'choices': ['Berlin', 'Paris', 'Madrid', 'Rome'],\n"
+        prompt += "      'answer': 'Paris'\n"
+        prompt += "    }\n"
+        prompt += "  ]\n"
         prompt += "}\n"
         return prompt
 
@@ -160,17 +172,19 @@ class QuizAgent:
             Optional[Dict]: A dictionary containing the quiz questions (with choices and answers),
                             or None if extraction fails.
         """
-        logger.debug(f"Raw LLM Response for Quiz: {response}") # Added debug log
+        logger.debug(f"Raw LLM Response for Quiz: {response}")  # Added debug log
         try:
             quiz_data = json.loads(response)
-            if not isinstance(quiz_data, dict) or 'questions' not in quiz_data or not isinstance(quiz_data['questions'], list):
+            if not isinstance(quiz_data, dict) or 'questions' not in quiz_data or not isinstance(quiz_data['questions'],
+                                                                                                 list):
                 logger.error(f"LLM response format is incorrect: {response}")
                 return None
             for q_data in quiz_data['questions']:
                 if not isinstance(q_data, dict) or \
-                   'question' not in q_data or not isinstance(q_data['question'], str) or \
-                   'choices' not in q_data or not isinstance(q_data['choices'], list) or len(q_data['choices']) != 4 or \
-                   'answer' not in q_data or not isinstance(q_data['answer'], str) or q_data['answer'] not in q_data['choices']:
+                        'question' not in q_data or not isinstance(q_data['question'], str) or \
+                        'choices' not in q_data or not isinstance(q_data['choices'], list) or len(q_data['choices']) != 4 or \
+                        'answer' not in q_data or not isinstance(q_data['answer'], str) or q_data['answer'] not in q_data[
+                    'choices']:
                     logger.error(f"Invalid question format in LLM response: {q_data}")
                     return None
             return quiz_data
@@ -179,6 +193,7 @@ class QuizAgent:
             return None
         except Exception as e:
             raise QuizAgentError(f"Error extracting quiz data: {e}. Response: {response}") from e
+
 
 if __name__ == '__main__':
     faiss_path = "data/index"
@@ -199,16 +214,16 @@ if __name__ == '__main__':
         class MockLLMWrapper:
             def generate_response(self, prompt, generation_kwargs):
                 return ["""
-                {
-                  "questions": [
                     {
-                      "question": "What is the powerhouse of the cell?",
-                      "choices": ["Nucleus", "Mitochondria", "Ribosome", "Endoplasmic Reticulum"],
-                      "answer": "Mitochondria"
+                        "questions": [
+                            {
+                                "question": "What is the powerhouse of the cell?",
+                                "choices": ["Nucleus", "Mitochondria", "Ribosome", "Endoplasmic Reticulum"],
+                                "answer": "Mitochondria"
+                            }
+                        ]
                     }
-                  ]
-                }
-                """]
+                    """]
 
         class MockVectorMemory:
             pass
@@ -216,7 +231,8 @@ if __name__ == '__main__':
         mock_llm_wrapper = MockLLMWrapper()
         mock_vector_memory = MockVectorMemory()
 
-        agent = QuizAgent(llm_wrapper=mock_llm_wrapper, vector_memory=mock_vector_memory, llm_config_path=llm_config, faiss_index_path=faiss_path, chunks_file_path=chunks_file_path) # Pass the directory
+        agent = QuizAgent(config={"llm_wrapper": mock_llm_wrapper, "vector_memory": mock_vector_memory,
+                                  "faiss_index_path": faiss_path, "chunks_file_path": chunks_file_path})
         query = "Cell biology"
         quiz = agent.generate_quiz(query)
         if quiz and "error" not in quiz:
@@ -224,7 +240,7 @@ if __name__ == '__main__':
             for q_data in quiz['questions']:
                 logger.info(f"\nQuestion: {q_data['question']}")
                 for i, choice in enumerate(q_data['choices']):
-                    logger.info(f"  {chr(ord('A') + i)}. {choice}")
+                    logger.info(f"  {chr(ord('A') + i)}. {choice}")
                 logger.info(f"Correct Answer: {q_data['answer']}\n")
         elif quiz:
             logger.error(f"Error: {quiz['error']}")

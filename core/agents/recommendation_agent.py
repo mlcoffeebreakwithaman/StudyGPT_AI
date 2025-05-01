@@ -2,7 +2,7 @@
 import sys
 import os
 import yaml
-from typing import List, Optional, Dict
+from typing import List, Optional, Dict, Any
 import logging
 import random
 import time
@@ -15,42 +15,50 @@ logger = logging.getLogger(__name__)
 project_root = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', '..'))
 sys.path.insert(0, project_root)
 
+from core.agents.base_agent import BaseAgent
 from core.agents.textbook_agent import TextbookAgent, FaissIndexError, ChunksFileError
 from core.llm_wrapper import LLMWrapper, LLMConnectionError, AgentConfigError
-from core.exceptions import RecommendationAgentError # Import
+from core.exceptions import RecommendationAgentError  # Import
 
-class RecommendationAgent:
-    def __init__(self, llm_wrapper: LLMWrapper, vector_memory, config: Optional[Dict] = None,
-                 faiss_index_path: str = "data/index",
-                 llm_config_path: str = "config/llm_config.yaml",
-                 chunks_file_path: str = "data/chunks.txt"):
+
+class RecommendationAgent(BaseAgent):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, **kwargs: Any):
         """
         Initializes the RecommendationAgent.
 
         Args:
-            llm_wrapper (LLMWrapper): An instance of the LLMWrapper.
-            vector_memory: An instance of the VectorMemory.
-            config (Optional[Dict]): Configuration dictionary. Defaults to None.
-            faiss_index_path (str): Path to the FAISS index directory.
-            llm_config_path (str): Path to the LLM configuration file.
-            chunks_file_path (str): Path to the text chunks file.
+            config (Optional[Dict]): Configuration dictionary containing llm_wrapper and vector_memory. Defaults to None.
+            **kwargs (Any): Additional keyword arguments.
         """
-        self.llm_wrapper = llm_wrapper
-        self.vector_memory = vector_memory
+        super().__init__(config, **kwargs)
+        if config:
+            self.llm_wrapper: LLMWrapper = config.get("llm_wrapper")
+            self.vector_memory = config.get("vector_memory")
+        else:
+            raise ValueError("Configuration dictionary must be provided to RecommendationAgent.")
+
+        self._initialize_internal_components(config)
+
+        logger = logging.getLogger(__name__)
+        logger.info("RecommendationAgent initialized.")
+
+    def _initialize_internal_components(self, config: Optional[Dict[str, Any]] = None):
+        """Initializes internal components like TextbookAgent."""
         self.config = config or {}
-        self.faiss_index_path = faiss_index_path
-        self.chunks_file_path = chunks_file_path
+        self.faiss_index_path = self.config.get("faiss_index_path", "data/index")
+        self.chunks_file_path = self.config.get("chunks_file_path", "data/chunks.txt")
         try:
-            self.textbook_agent = TextbookAgent(config=config, faiss_index_path=faiss_index_path,
-                                                 chunks_file_path=chunks_file_path)
+            self.textbook_agent = TextbookAgent(config=self.config,
+                                                faiss_index_path=self.faiss_index_path,
+                                                chunks_file_path=self.chunks_file_path)
         except (FaissIndexError, ChunksFileError) as e:
             logger.error(f"Error initializing TextbookAgent: {e}")
             raise RecommendationAgentError(f"Error initializing TextbookAgent: {e}") from e
-        self.max_new_tokens = 500
-        self.max_relevant_chunks = 5  # Increased for recommendations
-        self.num_recommendations = 3
-        self.max_retries = 3
-        self.retry_delay = 2  # seconds
+        self.max_new_tokens = self.config.get("max_new_tokens", 500)
+        self.max_relevant_chunks = self.config.get("max_relevant_chunks", 5)
+        self.num_recommendations = self.config.get("num_recommendations", 3)
+        self.max_retries = self.config.get("max_retries", 3)
+        self.retry_delay = self.config.get("retry_delay", 2)
 
     def get_resource_recommendations(self, query: str) -> Optional[List[str]]:
         """
@@ -114,7 +122,7 @@ class RecommendationAgent:
                     logger.error(f"All {self.max_retries} attempts to get recommendations failed due to an unexpected error.")
                     raise RecommendationAgentError(f"Failed to get recommendations after multiple retries due to: {e}") from e
 
-        return ["Failed to get recommendations after multiple retries."] # Should not reach here
+        return ["Failed to get recommendations after multiple retries."]  # Should not reach here
 
     def _build_prompt(self, query: str, context: Optional[List[str]] = None) -> str:
         """
@@ -146,11 +154,12 @@ class RecommendationAgent:
         """
         logger.debug(f"Raw LLM Response for Recommendation: {response}")
         lines = response.strip().split('\n')
-        recommendations = [line.lstrip('- ').strip() for line in lines if line.strip()] # Remove leading dashes and whitespace
+        recommendations = [line.lstrip('- ').strip() for line in lines if line.strip()]  # Remove leading dashes and whitespace
         if recommendations:
             return recommendations
         else:
             return None
+
 
 if __name__ == '__main__':
     faiss_path = "data/index"
@@ -179,7 +188,8 @@ if __name__ == '__main__':
         mock_llm_wrapper = MockLLMWrapper()
         mock_vector_memory = MockVectorMemory()
 
-        agent = RecommendationAgent(llm_wrapper=mock_llm_wrapper, vector_memory=mock_vector_memory, llm_config_path=llm_config, faiss_index_path=faiss_path, chunks_file_path=chunks_file_path)
+        agent = RecommendationAgent(config={"llm_wrapper": mock_llm_wrapper, "vector_memory": mock_vector_memory,
+                                           "faiss_index_path": faiss_path, "chunks_file_path": chunks_file_path})
         query = "Newton's laws of motion"
         recommendations = agent.get_resource_recommendations(query)
         if recommendations:

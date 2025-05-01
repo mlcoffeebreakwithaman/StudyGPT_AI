@@ -1,21 +1,26 @@
 import logging
 import json
 from typing import Optional, Dict, List, Any
-from core.exceptions import ProgressAgentError # Import
+from core.exceptions import ProgressAgentError  # Import
 
 # Initialize logging for this module
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(name)s - %(message)s')
 logger = logging.getLogger(__name__)
 
 class ProgressAgent:
-    def __init__(self, vector_memory, config: Optional[Dict] = None, save_file="progress.json"):
+    def __init__(self, config: Optional[Dict[str, Any]] = None, **kwargs: Any):
         """
         Initializes the ProgressAgent.
         """
-        self.vector_memory = vector_memory
+        super().__init__()  # Corrected line: Calling super().__init__() without arguments
+        if config:
+            self.vector_memory = config.get("vector_memory")
+        else:
+            raise ValueError("Configuration dictionary must be provided to ProgressAgent.")
         self.config = config or {}
-        self.save_file = save_file
+        self.save_file = self.config.get("progress_save_file", "progress.json")
         self.progress = self._load_progress()
+        logger.info("ProgressAgent initialized.")
 
     def _load_progress(self) -> Dict:
         """
@@ -57,13 +62,13 @@ class ProgressAgent:
             logger.info("ProgressAgent: Progress saved.")
         except Exception as e:
             logger.error(f"ProgressAgent: Error saving progress: {e}")
-            raise ProgressAgentError(f"Error saving progress: {e}") # Raise
+            raise ProgressAgentError(f"Error saving progress: {e}")  # Raise
 
     def record_preference(self, preference_type: str, value: str):
         """
         Records the user's learning preferences.
         """
-        if preference_type not in self.progress: #check
+        if preference_type not in self.progress:  # check
             logger.error(f"Invalid preference type: {preference_type}")
             raise ProgressAgentError(f"Invalid preference type: {preference_type}")
         self.progress[preference_type] = value
@@ -149,9 +154,10 @@ if __name__ == "__main__":
     # Mock VectorMemory for standalone testing
     class MockVectorMemory:
         pass
+
     mock_vector_memory = MockVectorMemory()
 
-    progress_agent = ProgressAgent(vector_memory=mock_vector_memory)
+    progress_agent = ProgressAgent(config={"vector_memory": mock_vector_memory})
     progress_agent.record_preference("interests", "physics, astronomy")
     progress_agent.record_preference("learning_style", "visual")
     progress_agent.record_topic_covered("Newton's Laws")

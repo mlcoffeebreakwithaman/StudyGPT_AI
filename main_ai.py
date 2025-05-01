@@ -87,8 +87,10 @@ async def main():
 
         agent_manager = AgentManager(
             config={"llm_wrapper": llm_instance, "llm_config_path": llm_config_path, "vector_memory": vector_memory},
-            agents={}  # AgentManager will initialize agents
+            # agents={}  <-- REMOVED THIS LINE
         )
+
+        print(f"Initialized agent_manager.agents: {agent_manager.agents}") # Added debug print here
 
         user_history: List[str] = []
 
