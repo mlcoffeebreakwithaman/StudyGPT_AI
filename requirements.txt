@@ -1,22 +1,25 @@
-# 🔥 Core AI / LangChain ecosystem
-langchain
-langchain-openai
-langchain-community
-langchainhub
-langgraph
-langchain_huggingface
+# 🔥 Core AI / LangChain Ecosystem (Considered but largely being replaced by direct Gemini API)
+# langchain                     # We might use some utilities but direct Gemini is the focus
+# langchain-openai              # Not directly using OpenAI
+# langchain-community           # FAISS integration is present
+# langchainhub
+# langgraph
+# langchain_huggingface         # Not directly using HuggingFace models
 
-# 🔥 LLMs and embeddings
-transformers
-sentence-transformers
-accelerate
-bitsandbytes
+# 🔥 LLMs and Embeddings
+# transformers                  # Might be a transitive dependency or for local embeddings (initially)
+sentence-transformers         # Used for initial FAISS setup
+# accelerate
+# bitsandbytes
+
+# 🔥 Google Gemini API
+google-generativeai           # For interacting with Gemini
 
 # 🔥 Retrieval / Vector DB
-faiss-cpu
-milvus
+faiss-cpu                     # Initial vector store
+# milvus                      # Potential future vector store
 
-# 🔥 PDF + Text Processing
+# 🔥 PDF + Text Processing (Likely needed for data ingestion)
 pdfplumber
 pymupdf
 pypdf
@@ -25,7 +28,7 @@ beautifulsoup4
 regex
 unidecode
 
-# 🔥 Data Handling / Preprocessing
+# 🔥 Data Handling / Preprocessing (Likely needed for data ingestion)
 pandas
 numpy
 scikit-learn
@@ -34,26 +37,28 @@ scikit-learn
 pyyaml
 python-dotenv
 yamllint
-cerberus
+# cerberus                      # Pydantic is our primary validation
 
 # 🔥 FastAPI Backend
 fastapi
 uvicorn
 python-multipart
 fastapi-cors
+slowapi                       # For rate limiting
 
 # 🔥 Logging & Error Handling
-loguru
+loguru                        # Preferred logging library
 
 # 🔥 Async Utilities
 aiofiles
 aiohttp
+httpx                         # For async HTTP requests (GeminiClient)
 
 # 🔥 Testing
 pytest
-httpx
+# httpx                       # Already listed above
 
-# 🔥 Security / Crypto
+# 🔥 Security / Crypto (Considered for future API security)
 python-jose
 
 # 🔥 Optional Dev Utilities
@@ -68,15 +73,22 @@ prometheus-client
 pydantic
 pydantic-settings
 
-# 🔥 LangChain Tracing / Debugging
-langsmith
-langchain-cli
+# 🔥 LangChain Tracing / Debugging (Less relevant with direct Gemini API initially)
+# langsmith
+# langchain-cli
 
 # 🔥 Experiment Tracking
 mlflow
 
 # 🔥 Miscellaneous
-rich
+rich                          # For enhanced console output
 requests
 reportlab
 nltk
+websockets                    # For WebSocket functionality (future)
+fastapi-limiter               # For more flexible rate limiting (future)
+SQLAlchemy                      # For database interaction (future user progress)
+psycopg2-binary               # PostgreSQL driver (future user progress)
+opentelemetry-api             # For observability (future)
+opentelemetry-sdk             # For observability (future)
+# opentelemetry-exporter-jaeger # Example trace exporter (future)
